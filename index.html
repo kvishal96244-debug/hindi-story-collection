@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="hi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>हिंदी कहानी लाइब्रेरी - Pagination + Admin</title>
+
+<style>
+body{margin:0;font-family:system-ui;background:#020617;color:white;}
+header{padding:15px;background:#0f172a;position:sticky;top:0;border-bottom:1px solid #1e293b;}
+.container{max-width:900px;margin:auto;padding:15px;}
+input,textarea,select{background:#020617;color:white;border:1px solid #1e293b;padding:8px;border-radius:8px;width:100%;}
+button{background:#2563eb;color:white;border:none;padding:6px 10px;border-radius:8px;margin-top:6px;cursor:pointer;}
+.story{background:#020617;padding:12px;border-radius:14px;border:1px solid #1e293b;margin-top:10px;}
+.adminBox{background:#020617;padding:15px;border-radius:14px;border:1px solid #22c55e;margin-bottom:15px;}
+.storyButtons button{margin-right:5px;background:#f97316;}
+.shortText{display:inline;}
+.fullText{display:none;}
+.pagination{display:flex;justify-content:space-between;margin-top:15px;}
+</style>
+</head>
+<body>
+
+<header><h2>📚 हिंदी कहानी लाइब्रेरी</h2></header>
+<div class="container">
+
+<!-- Admin Login -->
+<div id="loginBox" class="adminBox">
+<h3>🔐 Admin Login</h3>
+<input id="adminPass" placeholder="Admin Password डालें">
+<button onclick="login()">Login</button>
+<p id="loginError" style="color:red"></p>
+</div>
+
+<!-- Admin Panel -->
+<div id="adminPanel" style="display:none;" class="adminBox">
+<h3>✍️ कहानी जोड़ें / Edit</h3>
+<input id="title" placeholder="कहानी का शीर्षक">
+<select id="category">
+<option value="love">प्रेम कहानी</option>
+<option value="horror">हॉरर</option>
+<option value="moral">प्रेरणादायक</option>
+</select>
+<textarea id="content" rows="4" placeholder="कहानी लिखें..."></textarea>
+<button onclick="addOrEditStory()">Save Story</button>
+<button id="cancelEdit" style="display:none;" onclick="cancelEdit()">Cancel Edit</button>
+</div>
+
+<h3>📖 सभी कहानियाँ</h3>
+<div id="storyList"></div>
+
+<div class="pagination">
+  <button onclick="prevPage()">⬅ Previous</button>
+  <span id="pageInfo"></span>
+  <button onclick="nextPage()">Next ➡</button>
+</div>
+
+</div>
+
+<script>
+// 🔐 Admin Password
+const ADMIN_PASSWORD = "admin123";
+let isAdmin=false;
+
+// Story storage
+let stories = JSON.parse(localStorage.getItem("stories")) || [];
+let editIndex = -1;
+
+// Pagination
+let currentPage=1;
+const perPage=5;
+
+// Admin Login
+function login(){
+  const pass = document.getElementById("adminPass").value;
+  if(pass===ADMIN_PASSWORD){
+    document.getElementById("loginBox").style.display="none";
+    document.getElementById("adminPanel").style.display="block";
+    isAdmin=true;
+    render();
+  }else{
+    document.getElementById("loginError").innerText="गलत पासवर्ड ❌";
+  }
+}
+
+// Add or Edit Story
+function addOrEditStory(){
+  const t=document.getElementById("title").value.trim();
+  const c=document.getElementById("category").value;
+  const txt=document.getElementById("content").value.trim();
+  if(!t||!txt){alert("Title और कहानी लिखें");return;}
+  if(editIndex>=0){
+    stories[editIndex]={title:t,cat:c,text:txt};
+    editIndex=-1;
+    document.getElementById("cancelEdit").style.display="none";
+  }else{
+    stories.push({title:t,cat:c,text:txt});
+  }
+  document.getElementById("title").value="";
+  document.getElementById("content").value="";
+  save();
+  currentPage = Math.ceil(stories.length/perPage); // move to last page
+  render();
+}
+
+// Cancel Edit
+function cancelEdit(){
+  editIndex=-1;
+  document.getElementById("title").value="";
+  document.getElementById("content").value="";
+  document.getElementById("cancelEdit").style.display="none";
+}
+
+// Delete
+function deleteStory(i){
+  if(!isAdmin) return;
+  stories.splice(i,1);
+  save();
+  if((currentPage-1)*perPage >= stories.length && currentPage>1) currentPage--;
+  render();
+}
+
+// Edit
+function editStory(i){
+  if(!isAdmin) return;
+  editIndex=i;
+  document.getElementById("title").value=stories[i].title;
+  document.getElementById("content").value=stories[i].text;
+  document.getElementById("category").value=stories[i].cat;
+  document.getElementById("cancelEdit").style.display="inline-block";
+}
+
+// Toggle Read More / Less
+function toggleText(btn){
+  const shortText = btn.parentElement.querySelector(".shortText");
+  const fullText = btn.parentElement.querySelector(".fullText");
+  if(fullText.style.display==="none" || fullText.style.display===""){
+    fullText.style.display="inline";
+    shortText.style.display="none";
+    btn.innerText="Read Less";
+  }else{
+    fullText.style.display="none";
+    shortText.style.display="inline";
+    btn.innerText="Read More";
+  }
+}
+
+// Save to localStorage
+function save(){localStorage.setItem("stories",JSON.stringify(stories));}
+
+// Pagination controls
+function nextPage(){if(currentPage<Math.ceil(stories.length/perPage)){currentPage++;render();}}
+function prevPage(){if(currentPage>1){currentPage--;render();}}
+
+// Render Stories with Pagination
+function render(){
+  if(stories.length===0){document.getElementById("storyList").innerHTML="अभी कोई कहानी नहीं है।"; document.getElementById("pageInfo").innerText=""; return;}
+  
+  const start = (currentPage-1)*perPage;
+  const end = start + perPage;
+  const pageStories = stories.slice(start,end);
+  
+  let html="";
+  pageStories.forEach((s,i)=>{
+    let index = start+i; // real index in stories array
+    let preview = s.text.length>100 ? s.text.slice(0,100)+"..." : s.text;
+    html+=`<div class="story">
+      <h3>${s.title}</h3>
+      <p>
+        <span class="shortText">${preview}</span>
+        <span class="fullText">${s.text}</span>
+      </p>
+      <button onclick="toggleText(this)">Read More</button>
+      <br>`;
+    if(isAdmin){
+      html+=`<div class="storyButtons">
+        <button onclick="editStory(${index})">✏ Edit</button>
+        <button onclick="deleteStory(${index})">🗑 Delete</button>
+      </div>`;
+    }
+    html+=`</div>`;
+  });
+
+  document.getElementById("storyList").innerHTML=html;
+  document.getElementById("pageInfo").innerText=`Page ${currentPage} / ${Math.max(1,Math.ceil(stories.length/perPage))}`;
+}
+
+render();
+</script>
+
+</body>
+</html>
